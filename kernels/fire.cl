@@ -42,8 +42,104 @@ kernel void init_grid(global int* grid,
     }
 }
 
-// Kernel 2: fire_step (placeholder)
-kernel void fire_step(global int* grid) {
+// ─────────────────────────────────────────────
+// Kernel 2: fire_spread
+// Each work-item computes the next state of one cell.
+//
+// Rules (from assignment spec):
+//   0 (empty)   -> always stays 0
+//   2 (burning) -> always becomes 0 (burns out)
+//   1 (tree)    -> catches fire if:
+//                  - not immune (r < probImmune means immune)
+//                  - AND (a neighbour is burning OR lightning strikes)
+//
+// Moore neighbourhood: 8 surrounding cells.
+// Periodic boundary conditions: edges wrap around
+// using modular arithmetic so the grid is toroidal.
+//
+// Double buffering: reads from gridIn, writes to gridOut.
+// This avoids race conditions where one work-item reads
+// a cell that another has already updated this step.
+// ─────────────────────────────────────────────
+kernel void fire_spread(global const int* gridIn,
+                        global int* gridOut,
+                        int n,
+                        float probImmune,
+                        float probLightning,
+                        ulong seed) {
+
     int id = get_global_id(0);
-    grid[id] = grid[id];
+    if (id >= n * n) return;
+
+    // Convert flat id to 2D coordinates
+    int x = id % n;
+    int y = id / n;
+
+    int current = gridIn[id];
+
+    // ─────────────────────────────────────────────
+    // RULE 1: empty cells stay empty
+    // ─────────────────────────────────────────────
+    if (current == 0) {
+        gridOut[id] = 0;
+        return;
+    }
+
+    // ─────────────────────────────────────────────
+    // RULE 2: burning trees always burn out
+    // ─────────────────────────────────────────────
+    if (current == 2) {
+        gridOut[id] = 0;
+        return;
+    }
+
+    // ─────────────────────────────────────────────
+    // RULE 3: tree — check Moore neighbourhood
+    // Periodic boundaries: (x-1+n)%n wraps left edge
+    // to right edge, etc.
+    // ─────────────────────────────────────────────
+    int neighbourBurning = 0;
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx == 0 && dy == 0) continue; // skip self
+            int nx = (x + dx + n) % n;
+            int ny = (y + dy + n) % n;
+            if (gridIn[ny * n + nx] == 2) {
+                neighbourBurning = 1;
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // RANDOM NUMBERS FOR THIS CELL
+    // Mix seed with id and a step offset to get
+    // different values from init_grid's RNG.
+    // ─────────────────────────────────────────────
+    ulong state = seed + (ulong)id * 1099087573UL;
+    state = state * 6364136223846793005UL + 1442695040888963407UL;
+    float rImmune = (float)(state >> 33) / (float)(1u << 31);
+
+    state = state * 6364136223846793005UL + 1442695040888963407UL;
+    float rLightning = (float)(state >> 33) / (float)(1u << 31);
+
+    // ─────────────────────────────────────────────
+    // IMMUNITY CHECK
+    // If rImmune < probImmune the tree is immune
+    // and cannot catch fire this step.
+    // ─────────────────────────────────────────────
+    if (rImmune < probImmune) {
+        gridOut[id] = 1; // immune, stays as tree
+        return;
+    }
+
+    // ─────────────────────────────────────────────
+    // FIRE SPREAD / LIGHTNING
+    // Tree catches fire if a neighbour is burning
+    // OR if struck by lightning.
+    // ─────────────────────────────────────────────
+    if (neighbourBurning || rLightning < probLightning) {
+        gridOut[id] = 2; // catches fire
+    } else {
+        gridOut[id] = 1; // stays as tree
+    }
 }
