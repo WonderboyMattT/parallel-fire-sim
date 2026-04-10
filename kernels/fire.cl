@@ -112,15 +112,21 @@ kernel void fire_spread(global const int* gridIn,
 
     // ─────────────────────────────────────────────
     // RANDOM NUMBERS FOR THIS CELL
-    // Mix seed with id and a step offset to get
-    // different values from init_grid's RNG.
+    // Better hash-based RNG
     // ─────────────────────────────────────────────
-    ulong state = seed + (ulong)id * 1099087573UL;
-    state = state * 6364136223846793005UL + 1442695040888963407UL;
-    float rImmune = (float)(state >> 33) / (float)(1u << 31);
+    ulong state = seed ^ ((ulong)id * 2654435761UL);
+    state ^= (state >> 33);
+    state *= 0xff51afd7ed558ccdUL;
+    state ^= (state >> 33);
+    state *= 0xc4ceb9fe1a85ec53UL;
+    state ^= (state >> 33);
+    float rImmune = (float)(state & 0xFFFFFFFF) / (float)0xFFFFFFFF;
 
-    state = state * 6364136223846793005UL + 1442695040888963407UL;
-    float rLightning = (float)(state >> 33) / (float)(1u << 31);
+    state ^= ((ulong)id * 1000003UL + 1UL);
+    state ^= (state >> 33);
+    state *= 0xff51afd7ed558ccdUL;
+    state ^= (state >> 33);
+    float rLightning = (float)(state & 0xFFFFFFFF) / (float)0xFFFFFFFF;
 
     // ─────────────────────────────────────────────
     // IMMUNITY CHECK
