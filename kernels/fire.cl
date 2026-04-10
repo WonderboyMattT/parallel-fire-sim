@@ -11,34 +11,32 @@ kernel void init_grid(global int* grid,
                       ulong seed) {
 
     int id = get_global_id(0);
-    if (id >= n * n) return;  // bounds check
+    if (id >= n * n) return;
 
     // ─────────────────────────────────────────────
-    // RANDOM NUMBER GENERATION
-    // Each work-item gets a unique seed by mixing
-    // the global seed with its own id. This prevents
-    // all cells getting the same random value.
-    // LCG constants are from Numerical Recipes.
+    // Hash-based RNG — same approach as fire_spread
+    // to avoid the diagonal pattern from the LCG
     // ─────────────────────────────────────────────
-    ulong state = seed + (ulong)id * 1099087573UL;
-    state = state * 6364136223846793005UL + 1442695040888963407UL;
-    float r1 = (float)(state >> 33) / (float)(1u << 31);
+    ulong state = seed ^ ((ulong)id * 2654435761UL);
+    state ^= (state >> 33);
+    state *= 0xff51afd7ed558ccdUL;
+    state ^= (state >> 33);
+    state *= 0xc4ceb9fe1a85ec53UL;
+    state ^= (state >> 33);
+    float r1 = (float)(state & 0xFFFFFFFF) / (float)0xFFFFFFFF;
 
-    state = state * 6364136223846793005UL + 1442695040888963407UL;
-    float r2 = (float)(state >> 33) / (float)(1u << 31);
+    state ^= ((ulong)id * 1000003UL + 1UL);
+    state ^= (state >> 33);
+    state *= 0xff51afd7ed558ccdUL;
+    state ^= (state >> 33);
+    float r2 = (float)(state & 0xFFFFFFFF) / (float)0xFFFFFFFF;
 
-    // ─────────────────────────────────────────────
-    // CELL STATE RULES (from assignment spec):
-    // 0 = empty, 1 = tree, 2 = burning tree
-    // First decide if cell is a tree (probTree),
-    // then if that tree is burning (probBurning).
-    // ─────────────────────────────────────────────
     if (r1 >= probTree) {
-        grid[id] = 0;  // empty
+        grid[id] = 0;
     } else if (r2 < probBurning) {
-        grid[id] = 2;  // burning tree
+        grid[id] = 2;
     } else {
-        grid[id] = 1;  // tree, not burning
+        grid[id] = 1;
     }
 }
 

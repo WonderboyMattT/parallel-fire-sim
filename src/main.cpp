@@ -7,6 +7,8 @@
 #include <fstream>
 #include <string>
 #include <chrono>
+#include "CImg.h"
+using namespace cimg_library;
 
 std::string loadKernelSource(const std::string& path) {
     std::ifstream file(path);
@@ -16,18 +18,45 @@ std::string loadKernelSource(const std::string& path) {
                        std::istreambuf_iterator<char>());
 }
 
+// ─────────────────────────────────────────────
+// Helper: convert int grid to RGB CImg
+// 0 = empty  -> brown  (80, 50, 20)
+// 1 = tree   -> green       (34, 139, 34)
+// 2 = burning -> orange (220, 60, 10)
+// ─────────────────────────────────────────────
+CImg<unsigned char> gridToImage(const std::vector<int>& grid, int N, int cellSize = 4) {
+    CImg<unsigned char> img(N * cellSize, N * cellSize, 1, 3, 0);
+    for (int y = 0; y < N; y++) {
+        for (int x = 0; x < N; x++) {
+            int val = grid[y * N + x];
+            unsigned char r, g, b;
+            if      (val == 0) { r = 80;  g = 50;  b = 20;  }  // empty
+            else if (val == 1) { r = 34;  g = 139; b = 34;  }  // tree
+            else               { r = 220; g = 60;  b = 10;  }  // burning
+            // Fill cellSize x cellSize block
+            for (int py = 0; py < cellSize; py++)
+                for (int px = 0; px < cellSize; px++) {
+                    img(x * cellSize + px, y * cellSize + py, 0, 0) = r;
+                    img(x * cellSize + px, y * cellSize + py, 0, 1) = g;
+                    img(x * cellSize + px, y * cellSize + py, 0, 2) = b;
+                }
+        }
+    }
+    return img;
+}
+
 int main() {
 
         // ─────────────────────────────────────────────
         // SIMULATION PARAMETERS
         // ─────────────────────────────────────────────
-        const int N               = 100;
-        const int STEPS           = 50;
-        const float probTree      = 0.8f;
-        const float probBurning   = 0.01f;
-        const float probImmune    = 0.3f;
-        const float probLightning = 0.001f;
-        const int gridSize        = N * N;
+        const int N               = 400; // Grid size (N x N)
+        const int STEPS           = 50; // Number of simulation steps
+        const float probTree      = 0.8f; // Initial tree density
+        const float probBurning   = 0.01f; // Initial burning tree density
+        const float probImmune    = 0.3f; // Probability a tree is immune to fire (won't burn)
+        const float probLightning = 0.001f; // Probability of lightning strike
+        const int gridSize        = N * N; // Total number of cells
 
         // ─────────────────────────────────────────────
         // PLATFORM & DEVICE SELECTION
@@ -135,6 +164,16 @@ int main() {
         };
         countCells("Initial counts");
 
+// ─────────────────────────────────────────────
+        // VISUALISATION SETUP
+        // cellSize scales each grid cell up so it's
+        // visible — 4px per cell on a 100x100 grid
+        // gives a 400x400 window.
+        // ─────────────────────────────────────────────
+        const int cellSize = 4; // Scale factor for display (Smaller for larger grids, but bigger is slower to render)
+        CImg<unsigned char> img = gridToImage(hostGrid, N, cellSize);
+        CImgDisplay display(img, "Forest Fire Simulation");
+
         // ─────────────────────────────────────────────
         // FIRE SPREAD SIMULATION LOOP
         // ─────────────────────────────────────────────
@@ -145,6 +184,10 @@ int main() {
         double totalSpreadTime = 0.0;
 
         for (int step = 0; step < STEPS; step++) {
+
+            // Exit if window is closed
+            if (display.is_closed()) break;
+
             cl_ulong stepSeed = seed + (cl_ulong)step * 999983UL;
 
             spreadKernel.setArg(0, *bufIn);
@@ -164,10 +207,30 @@ int main() {
                                 spreadEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>()) * 1e-6;
 
             std::swap(bufIn, bufOut);
+
+            // ─────────────────────────────────────────────
+            // READ BACK & UPDATE DISPLAY EACH STEP
+            // Note: readback every step adds overhead —
+            // this is display mode only. Benchmarking
+            // will skip this (step 7).
+            // ─────────────────────────────────────────────
+            queue.enqueueReadBuffer(*bufIn, CL_TRUE, 0,
+                                    sizeof(int) * gridSize, hostGrid.data());
+
+            img = gridToImage(hostGrid, N, cellSize);
+            display.display(img);
+            display.set_title("Forest Fire — Step %d/%d", step + 1, STEPS);
+
+            // Small delay so it's watchable
+            cimg::wait(500);
         }
 
-        std::cout << "\nFire spread total (" << STEPS << " steps): " << totalSpreadTime << " ms\n";
+        std::cout << "\nFire spread total (" << STEPS << " steps): "
+                  << totalSpreadTime << " ms\n";
         std::cout << "Average per step: " << totalSpreadTime / STEPS << " ms\n";
+
+        // Wait for window close before exiting
+        while (!display.is_closed()) display.wait();
 
         // ─────────────────────────────────────────────
         // READ BACK & PRINT FINAL STATE
