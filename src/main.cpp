@@ -45,12 +45,30 @@ CImg<unsigned char> gridToImage(const std::vector<int>& grid, int N, int cellSiz
     return img;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    try {
+
+        // ─────────────────────────────────────────────
+        // COMMAND LINE ARGUMENTS
+        // Usage: ./fire.exe [cpu|gpu] [visualise]
+        // e.g:   ./fire.exe gpu
+        //        ./fire.exe cpu visualise
+        // Defaults to GPU, no visualisation
+        // ─────────────────────────────────────────────
+        bool useCPU    = false;
+        bool visualise = false;
+
+        for (int i = 1; i < argc; i++) {
+            std::string arg = argv[i];
+            if (arg == "cpu")       useCPU    = true;
+            if (arg == "gpu")       useCPU    = false;
+            if (arg == "visualise") visualise = true;
+        }
 
         // ─────────────────────────────────────────────
         // SIMULATION PARAMETERS
         // ─────────────────────────────────────────────
-        const int N               = 400; // Grid size (N x N)
+        const int N               = 100; // Grid size (N x N)
         const int STEPS           = 50; // Number of simulation steps
         const float probTree      = 0.8f; // Initial tree density
         const float probBurning   = 0.01f; // Initial burning tree density
@@ -78,19 +96,18 @@ int main() {
             }
         }
 
-        auto printDevice = [](const std::string& label, const cl::Device& d) {
-            std::cout << "\n[" << label << "]\n";
-            std::cout << "  Name:          " << d.getInfo<CL_DEVICE_NAME>() << "\n";
-            std::cout << "  Compute Units: " << d.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << "\n";
-            std::cout << "  Global Mem:    " << d.getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>() / (1024*1024) << " MB\n";
-            std::cout << "  Max WG Size:   " << d.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << "\n";
-        };
+        if (!foundCPU && useCPU) { std::cerr << "No CPU device found.\n"; return 1; }
+        if (!foundGPU && !useCPU) { std::cerr << "No GPU device found.\n"; return 1; }
 
-        if (foundCPU) printDevice("CPU", cpuDevice);
-        if (foundGPU) printDevice("GPU", gpuDevice);
+        cl::Device activeDevice = useCPU ? cpuDevice : gpuDevice;
 
-        cl::Device activeDevice = foundGPU ? gpuDevice : cpuDevice;
-        std::cout << "\nUsing: " << activeDevice.getInfo<CL_DEVICE_NAME>() << "\n";
+        std::cout << "====================================\n";
+        std::cout << "Device: " << activeDevice.getInfo<CL_DEVICE_NAME>() << "\n";
+        std::cout << "Grid:   " << N << " x " << N << "\n";
+        std::cout << "Steps:  " << STEPS << "\n";
+        std::cout << "Mode:   " << (visualise ? "visualise" : "benchmark") << "\n";
+        std::cout << "====================================\n";
+
 
         // ─────────────────────────────────────────────
         // CONTEXT, QUEUE, PROGRAM
@@ -117,6 +134,12 @@ int main() {
         cl::Buffer bufferB(context, CL_MEM_READ_WRITE, sizeof(int) * gridSize);
 
         // ─────────────────────────────────────────────
+        // TOTAL WALL CLOCK START
+        // Measures everything including transfers
+        // ─────────────────────────────────────────────
+        auto wallStart = std::chrono::steady_clock::now();
+
+        // ─────────────────────────────────────────────
         // INIT GRID KERNEL
         // ─────────────────────────────────────────────
         cl::Kernel initKernel(program, "init_grid");
@@ -134,11 +157,12 @@ int main() {
                                    nullptr, &initEvent);
         queue.finish();
 
-        double initTime = (initEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() -
-                           initEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>()) * 1e-6;
-        std::cout << "\nGrid init time: " << initTime << " ms\n";
+        // OpenCL event profiling for init kernel
+        double initKernelTime = (initEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>() -
+                                 initEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>()) * 1e-6;
 
-        // ─────────────────────────────────────────────
+
+        /* ─────────────────────────────────────────────
         // PRINT INITIAL STATE
         // ─────────────────────────────────────────────
         std::vector<int> hostGrid(gridSize);
@@ -164,15 +188,28 @@ int main() {
         };
         countCells("Initial counts");
 
-// ─────────────────────────────────────────────
+        */
+
+        // ─────────────────────────────────────────────
         // VISUALISATION SETUP
         // cellSize scales each grid cell up so it's
         // visible — 4px per cell on a 100x100 grid
         // gives a 400x400 window.
         // ─────────────────────────────────────────────
-        const int cellSize = 4; // Scale factor for display (Smaller for larger grids, but bigger is slower to render)
-        CImg<unsigned char> img = gridToImage(hostGrid, N, cellSize);
-        CImgDisplay display(img, "Forest Fire Simulation");
+        //const int cellSize = 4; // Scale factor for display (Smaller for larger grids, but bigger is slower to render)
+        //CImg<unsigned char> img = gridToImage(hostGrid, N, cellSize);
+        //CImgDisplay display(img, "Forest Fire Simulation");
+
+        std::vector<int> hostGrid(gridSize);
+        std::unique_ptr<CImgDisplay> display;
+
+        if (visualise) {
+            queue.enqueueReadBuffer(bufferA, CL_TRUE, 0,
+                                    sizeof(int) * gridSize, hostGrid.data());
+            const int cellSize = (N <= 100) ? 6 : (N <= 400) ? 2 : 1;
+            CImg<unsigned char> img = gridToImage(hostGrid, N, cellSize);
+            display = std::make_unique<CImgDisplay>(img, "Forest Fire Simulation");
+        }
 
         // ─────────────────────────────────────────────
         // FIRE SPREAD SIMULATION LOOP
@@ -185,8 +222,7 @@ int main() {
 
         for (int step = 0; step < STEPS; step++) {
 
-            // Exit if window is closed
-            if (display.is_closed()) break;
+            if (visualise && display && display->is_closed()) break;
 
             cl_ulong stepSeed = seed + (cl_ulong)step * 999983UL;
 
@@ -209,6 +245,22 @@ int main() {
             std::swap(bufIn, bufOut);
 
             // ─────────────────────────────────────────────
+            // DISPLAY UPDATE (visualise mode only)
+            // Readback is skipped in benchmark mode to
+            // keep timing clean.
+            // ─────────────────────────────────────────────
+            if (visualise && display) {
+                const int cellSize = (N <= 100) ? 6 : (N <= 400) ? 2 : 1;
+                queue.enqueueReadBuffer(*bufIn, CL_TRUE, 0,
+                                        sizeof(int) * gridSize, hostGrid.data());
+                CImg<unsigned char> img = gridToImage(hostGrid, N, cellSize);
+                display->display(img);
+                display->set_title("Forest Fire — Step %d/%d", step + 1, STEPS);
+                cimg::wait(200);
+            }
+        }
+
+            /* ─────────────────────────────────────────────
             // READ BACK & UPDATE DISPLAY EACH STEP
             // Note: readback every step adds overhead —
             // this is display mode only. Benchmarking
@@ -221,8 +273,8 @@ int main() {
             display.display(img);
             display.set_title("Forest Fire — Step %d/%d", step + 1, STEPS);
 
-            // Small delay so it's watchable
-            cimg::wait(500);
+            // Delay to make visualisation smoother (recommend 100 for real-time, but 500ms for clearer step-by-step) (remove for benchmarking)
+            cimg::wait(100);
         }
 
         std::cout << "\nFire spread total (" << STEPS << " steps): "
@@ -245,6 +297,47 @@ int main() {
         }
         countCells("Final counts");
 
-        std::cout << "\nPlaceholder.\n";
+        */
 
+            // ─────────────────────────────────────────────
+        // TOTAL WALL CLOCK STOP
+        // ─────────────────────────────────────────────
+        auto wallEnd = std::chrono::steady_clock::now();
+        double wallTime = std::chrono::duration<double, std::milli>(wallEnd - wallStart).count();
+
+        // ─────────────────────────────────────────────
+        // RESULTS
+        // ─────────────────────────────────────────────
+        std::cout << "\n--- Timing Results ---\n";
+        std::cout << "Init kernel time:        " << initKernelTime << " ms\n";
+        std::cout << "Spread total (" << STEPS << " steps): " << totalSpreadTime << " ms\n";
+        std::cout << "Spread average per step: " << totalSpreadTime / STEPS << " ms\n";
+        std::cout << "Total wall clock time:   " << wallTime << " ms\n";
+
+        // ─────────────────────────────────────────────
+        // FINAL CELL COUNTS
+        // ─────────────────────────────────────────────
+        queue.enqueueReadBuffer(*bufIn, CL_TRUE, 0, sizeof(int) * gridSize, hostGrid.data());
+        int empty = 0, trees = 0, burning = 0;
+        for (int v : hostGrid) {
+            if (v == 0) empty++;
+            else if (v == 1) trees++;
+            else if (v == 2) burning++;
+        }
+        std::cout << "\nFinal counts -- Empty: " << empty
+                  << "  Trees: " << trees
+                  << "  Burning: " << burning << "\n";
+
+        if (visualise && display)
+            while (!display->is_closed()) display->wait();
+
+    } catch (const cl::Error& e) {
+        std::cerr << "OpenCL error: " << e.what() << " (" << e.err() << ")\n";
+        return 1;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+
+    return 0;
 }
