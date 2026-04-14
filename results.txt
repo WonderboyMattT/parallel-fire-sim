@@ -1,0 +1,163 @@
+Forest Fire Benchmark Results
+==============================
+
+=== Grid Size: 100x100 ===
+-- GPU --
+====================================
+Device: NVIDIA GeForce GTX 1080
+Grid:   100 x 100
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.007744 ms
+Spread total (50 steps): 0.2512 ms
+Spread average per step: 0.005024 ms
+Total wall clock time:   1.8042 ms
+
+Final counts -- Empty: 9841  Trees: 159  Burning: 0
+-- CPU --
+====================================
+Device: Intel(R) Core(TM) i5-9600K CPU @ 3.70GHz
+Grid:   100 x 100
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.1178 ms
+Spread total (50 steps): 2.0631 ms
+Spread average per step: 0.041262 ms
+Total wall clock time:   3.5123 ms
+
+Final counts -- Empty: 9836  Trees: 164  Burning: 0
+
+=== Grid Size: 400x400 ===
+-- GPU --
+====================================
+Device: NVIDIA GeForce GTX 1080
+Grid:   400 x 400
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.012288 ms
+Spread total (50 steps): 0.665376 ms
+Spread average per step: 0.0133075 ms
+Total wall clock time:   2.6399 ms
+
+Final counts -- Empty: 157525  Trees: 2472  Burning: 3
+-- CPU --
+====================================
+Device: Intel(R) Core(TM) i5-9600K CPU @ 3.70GHz
+Grid:   400 x 400
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.6211 ms
+Spread total (50 steps): 28.0672 ms
+Spread average per step: 0.561344 ms
+Total wall clock time:   31.9162 ms
+
+Final counts -- Empty: 157427  Trees: 2570  Burning: 3
+
+=== Grid Size: 800x800 ===
+-- GPU --
+====================================
+Device: NVIDIA GeForce GTX 1080
+Grid:   800 x 800
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.026624 ms
+Spread total (50 steps): 2.0592 ms
+Spread average per step: 0.041184 ms
+Total wall clock time:   6.1497 ms
+
+Final counts -- Empty: 629703  Trees: 10289  Burning: 8
+-- CPU --
+====================================
+Device: Intel(R) Core(TM) i5-9600K CPU @ 3.70GHz
+Grid:   800 x 800
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        1.1191 ms
+Spread total (50 steps): 81.0286 ms
+Spread average per step: 1.62057 ms
+Total wall clock time:   86.4744 ms
+
+Final counts -- Empty: 629964  Trees: 10032  Burning: 4
+
+=== Grid Size: 1000x1000 ===
+-- GPU --
+====================================
+Device: NVIDIA GeForce GTX 1080
+Grid:   1000 x 1000
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.037888 ms
+Spread total (50 steps): 3.05206 ms
+Spread average per step: 0.0610413 ms
+Total wall clock time:   8.1099 ms
+
+Final counts -- Empty: 984397  Trees: 15590  Burning: 13
+-- CPU --
+====================================
+Device: Intel(R) Core(TM) i5-9600K CPU @ 3.70GHz
+Grid:   1000 x 1000
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        2.5048 ms
+Spread total (50 steps): 177.671 ms
+Spread average per step: 3.55341 ms
+Total wall clock time:   185.567 ms
+
+Final counts -- Empty: 984201  Trees: 15782  Burning: 17
+
+=== Grid Size: 1200x1200 ===
+-- GPU --
+====================================
+Device: NVIDIA GeForce GTX 1080
+Grid:   1200 x 1200
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        0.049152 ms
+Spread total (50 steps): 4.22058 ms
+Spread average per step: 0.0844115 ms
+Total wall clock time:   10.2147 ms
+
+Final counts -- Empty: 1416989  Trees: 22982  Burning: 29
+-- CPU --
+====================================
+Device: Intel(R) Core(TM) i5-9600K CPU @ 3.70GHz
+Grid:   1200 x 1200
+Steps:  50
+Mode:   benchmark
+====================================
+
+--- Timing Results ---
+Init kernel time:        2.1836 ms
+Spread total (50 steps): 175.767 ms
+Spread average per step: 3.51535 ms
+Total wall clock time:   184.277 ms
+
+Final counts -- Empty: 1417209  Trees: 22769  Burning: 22
+

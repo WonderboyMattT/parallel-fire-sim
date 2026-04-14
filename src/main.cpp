@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
         // ─────────────────────────────────────────────
         // SIMULATION PARAMETERS
         // ─────────────────────────────────────────────
-        const int N               = 100; // Grid size (N x N)
+        const int N               = 1200; // Grid size (N x N)
         const int STEPS           = 50; // Number of simulation steps
         const float probTree      = 0.8f; // Initial tree density
         const float probBurning   = 0.01f; // Initial burning tree density
