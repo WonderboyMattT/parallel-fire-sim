@@ -71,12 +71,16 @@ Set in `src/main.cpp`:
 | `N`             | 100–1200 | Grid size (N×N)                          |
 | `STEPS`         | 50       | Number of simulation steps               |
 
+Alter cimg::wait() to increase step time for slower visualisation (1000 = 1 second per step)
+cellsize for larger "pixels"
+N for grid size
+
 ## Benchmarking
 
 To run the full benchmark across all required grid sizes on both devices:
 
 ```bash
-bash benchmark.sh
+bash ./benchmark.sh
 ```
 
 Results are saved to `results.txt`.
